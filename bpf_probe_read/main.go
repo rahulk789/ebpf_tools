@@ -5,23 +5,33 @@
 package main
 
 import (
-	"log"
-	"time"
+//    "errors"
+    "syscall"
+    "os/signal"
+    "os"
+    "log"
+    "bytes"
+    "encoding/binary"
     "fmt"
-    "flag"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
+    "github.com/cilium/ebpf/perf"
+    "golang.org/x/sys/unix"
+
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang bpf ./pid.bpf.c -- -I/usr/include/bpf -I.
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang -type info bpf ./pid.bpf.c -- -I/usr/include/bpf -I.
 
 
 func main() {
 
-    matchpid := flag.Int64("matchpid",1000,"pid to be matched")
-    flag.Parse()
-    fmt.Println("argument that you have given:", *matchpid)
+    //matchpid := flag.Int64("matchpid",1000,"pid to be matched")
+    //port := flag.Int64("port",4040,"port to be passed")
+    //flag.Parse()
+    //fmt.Println("argument that you have given: \n pid: %d port %d \n", *matchpid,*port)
     
+	stopper := make(chan os.Signal, 1)
+	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 
     if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
@@ -33,46 +43,52 @@ func main() {
 	}
 	defer objs.Close()
 
-    kprobe,err := link.Kprobe("sys_execve",objs.PidMatcher, nil)
+    kprobe,err := link.Kprobe("sys_bind",objs.BindIntercept, nil)
     if err!=nil {
         log.Fatalf("opening kprobe: %s",err)
     }
     defer kprobe.Close()
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-
-    // Store the current pid at 0th index
-    // Store 1 at 1th indext if current pid matches pid given by user, else store 2
-    // Store pid given by the user at 2nd index.
-	
-    const mapkey0 uint32 = 0
-	const mapkey1 uint32 = 1
-    const mapkey2 uint32 = 2
-	if err := objs.Pidcheck.Put(mapkey2, matchpid); err != nil {
-		log.Fatalf("reading map: %v", err)
+    rd, err := perf.NewReader(objs.Pipe, os.Getpagesize())
+	if err != nil {
+		log.Fatalf("creating perf event reader: %s", err)
 	}
-    var count int=0
-    for range ticker.C {
-        var value1 uint64
-        var value2 uint64
-        count=count+1
-        // var value bpfPidstruct
-		if err := objs.Pidcheck.Lookup(mapkey0, &value1); err != nil {
-			log.Fatalf("reading map: %v", err)
+	defer rd.Close()
+
+    record:=make(chan []byte)
+	var event bpfInfo
+    go func() {
+		for {
+			eventss, err := rd.Read()
+            if err != nil {
+			    log.Fatalf("closing ringbuf reader: %s", err)
+            }
+           record <- eventss.RawSample
 		}
-        if err := objs.Pidcheck.Lookup(mapkey1, &value2); err != nil {
-			log.Fatalf("reading map: %v", err)
+	}()
+
+	log.Printf("Listening for events..")
+	for {   	
+            go func() {
+		        <-stopper
+		        if err := rd.Close(); err != nil {
+			    log.Fatalf("closing ringbuf reader: %s", err)
+                }
+	        }()
+
+            raw := <-record 
+            event.Pid =  binary.LittleEndian.Uint32(raw[0:32])
+            event.Rport =  binary.BigEndian.Uint16(raw[40:42])
+            event.Lport = binary.LittleEndian.Uint16(raw[36:38])
+            fmt.Printf("pid: %d\n", event.Pid)
+			fmt.Printf("dest port: %d\n", event.Lport)
+        if err := binary.Read(bytes.NewBuffer(raw), binary.LittleEndian, &event); err != nil {
+		    	log.Printf("parsing perf event: %s", err)
+                continue
+		    }   
+ 			fmt.Printf("src port: %d\n", event.Rport)
+               fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))
+            //event.Comm =  binary.LittleEndian.Uint32(raw[32:64])
+            fmt.Printf("\n")
 		}
-        // check if pid is matched or not
-        if (value2==1){
-        log.Printf("Current pid %d \t is pid matched? %s \n",value1,"No")
-        continue
-        }
-        if count==1 {
-            continue
-        }
-        log.Printf("Current pid %d \t is pid matched? %s \n",value1,"Yes!!!")
-    }
 }

@@ -13,6 +13,13 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type bpfInfo struct {
+	Pid   uint32
+	Comm  [32]uint8
+	Lport uint16
+	Rport uint16
+}
+
 // loadBpf returns the embedded CollectionSpec for bpf.
 func loadBpf() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_BpfBytes)
@@ -54,14 +61,14 @@ type bpfSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
-	PidMatcher *ebpf.ProgramSpec `ebpf:"pid_matcher"`
+	BindIntercept *ebpf.ProgramSpec `ebpf:"bind_intercept"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	Pidcheck *ebpf.MapSpec `ebpf:"pidcheck"`
+	Pipe *ebpf.MapSpec `ebpf:"pipe"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -83,12 +90,12 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	Pidcheck *ebpf.Map `ebpf:"pidcheck"`
+	Pipe *ebpf.Map `ebpf:"pipe"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
-		m.Pidcheck,
+		m.Pipe,
 	)
 }
 
@@ -96,12 +103,12 @@ func (m *bpfMaps) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
-	PidMatcher *ebpf.Program `ebpf:"pid_matcher"`
+	BindIntercept *ebpf.Program `ebpf:"bind_intercept"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
-		p.PidMatcher,
+		p.BindIntercept,
 	)
 }
 

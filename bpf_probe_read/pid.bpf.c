@@ -1,47 +1,52 @@
 // +build ignore
 
 #include "vmlinux.h"
+#include <bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
-struct bpf_map_def {
-      unsigned int type;
-      unsigned int key_size;
-      unsigned int value_size;
-      unsigned int max_entries;
-      unsigned int map_flags;
-};
-struct bpf_map_def SEC("maps") pidcheck = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-    .value_size = sizeof(u64),
-    .max_entries = 3,
+#define READ_KERN(ptr)                                                                         \
+    ({                                                                                         \
+        typeof(ptr) _val;                                                                      \
+        __builtin_memset((void *) &_val, 0, sizeof(_val));                                     \
+        bpf_core_read((void *) &_val, sizeof(_val), &ptr);                                     \
+        _val;                                                                                  \
+    })
+
+#define PT_REGS_PARM1(x) ((x)->di)
+#define PT_REGS_PARM2(x) ((x)->si)
+#define PT_REGS_PARM3(x) ((x)->dx)
+#define PT_REGS_PARM4(x) ((x)->cx)
+#define PT_REGS_PARM5(x) ((x)->r8)
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+} pipe SEC(".maps");
+
+struct info {
+    u32 pid;
+    u8 comm[32];
+    u16 lport;
+    u16 rport;
 };
 
-const struct pidstruct *unused __attribute__((unused));
+const struct info *unused __attribute__((unused));
 
-SEC("kprobe/sys_execve")
-int pid_matcher(struct pt_regs *ctx) {
-    u64 p,*boolval,*matchval,present=2,empty=1;
-    u32 index0 = 0; //value at index0 current pid
-    u32 index1 = 1; //value at index1 is 2 if matched 1 if not matched
-    u32 index2 = 2; //value at index2 has user asked pid
+SEC("kprobe/sys_bind")
+int bind_intercept(struct pt_regs *ctx) {
+    struct info infostruct;
+    struct sock *sk = (struct sock *) PT_REGS_PARM1(ctx);
+    struct sock_common conn = READ_KERN(sk->__sk_common);
+
+    u64 p= bpf_get_current_pid_tgid();
+    p = p >>32;
     
-    p=bpf_get_current_pid_tgid();
-    p = p >> 32 ;
-    bpf_map_update_elem(&pidcheck,&index0,&p,BPF_ANY);
+    infostruct.pid=p;
+    bpf_get_current_comm(&infostruct.comm,sizeof(infostruct.comm));
+    infostruct.lport  = BPF_CORE_READ(sk, __sk_common.skc_num),
+	infostruct.rport  = BPF_CORE_READ(sk, __sk_common.skc_dport),     
     
-    
-    matchval = bpf_map_lookup_elem(&pidcheck,&index2); //user pid
-    if (matchval){
-        if (p==*matchval){
-            boolval = bpf_map_lookup_elem(&pidcheck,&index1); // matched or not
-            if (boolval){
-                bpf_map_update_elem(&pidcheck, &index1, &present, BPF_ANY); //update if matched
-                return 0;}
-            }
-        }
-    bpf_map_update_elem(&pidcheck,&index1,&empty,BPF_ANY); //no match
+    bpf_perf_event_output(ctx,&pipe, BPF_F_CURRENT_CPU, &infostruct, sizeof(infostruct));
     return 0;
 }

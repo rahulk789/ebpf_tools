@@ -33,8 +33,9 @@ struct info {
 
 const struct info *unused __attribute__((unused));
 
-SEC("kprobe/sys_bind")
+SEC("kprobe/sys_tcp_connect")
 int bind_intercept(struct pt_regs *ctx) {
+
     struct info infostruct;
     struct sock *sk = (struct sock *) PT_REGS_PARM1(ctx);
     struct sock_common conn = READ_KERN(sk->__sk_common);

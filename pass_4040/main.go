@@ -81,8 +81,8 @@ func main() {
             event.Rport =  binary.BigEndian.Uint16(raw[38:40]) 
             event.Lport = binary.LittleEndian.Uint16(raw[36:38])
             fmt.Printf("pid: %d\n", event.Pid)
- 			fmt.Printf("dest port: %d\n", event.Rport)
-			fmt.Printf("src port: %d\n", event.Lport)
+ 			fmt.Printf("src port: %d\n", event.Rport)
+			fmt.Printf("dest port: %d\n", event.Lport)
             if err := binary.Read(bytes.NewBuffer(raw), binary.LittleEndian, &event); err != nil {
 		    	log.Printf("parsing perf event: %s", err)
                 continue

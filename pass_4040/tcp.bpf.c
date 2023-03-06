@@ -3,7 +3,7 @@
 #include "vmlinux.h"
 #include <bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
-
+#include <bpf_endian.h>
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 #define READ_KERN(ptr)                                                                         \
@@ -33,8 +33,8 @@ struct info {
 
 const struct info *unused __attribute__((unused));
 
-SEC("kprobe/sys_tcp_connect")
-int bind_intercept(struct pt_regs *ctx) {
+SEC("kprobe/security_socket_bind")
+int bind_intercept(struct pt_regs *ctx,  const struct sockaddr *addr) {
 
     struct info infostruct;
     struct sock *sk = (struct sock *) PT_REGS_PARM1(ctx);
@@ -45,9 +45,42 @@ int bind_intercept(struct pt_regs *ctx) {
     
     infostruct.pid=p;
     bpf_get_current_comm(&infostruct.comm,sizeof(infostruct.comm));
-    infostruct.lport  = BPF_CORE_READ(sk, __sk_common.skc_num),
-	infostruct.rport  = BPF_CORE_READ(sk, __sk_common.skc_dport),     
+    
+    struct sockaddr *address = (struct sockaddr *) PT_REGS_PARM2(ctx);
+    struct sockaddr_in *in_addr = (struct sockaddr_in *) address;
+
+    infostruct.lport = READ_KERN(in_addr->sin_port);
+    infostruct.rport  = READ_KERN(sk->__sk_common.skc_num);
+	//infostruct.rport  = BPF_CORE_READ(sk, __sk_common.skc_dport),     
     
     bpf_perf_event_output(ctx,&pipe, BPF_F_CURRENT_CPU, &infostruct, sizeof(infostruct));
     return 0;
 }
+/*
+SEC("socket")
+int socket(struct __sk_buff *skb) {
+  void *data = (void *)(long)skb->data;
+  void *data_end = (void *)(long)skb->data_end;
+  struct ethhdr *eth = data;
+
+  if ((void *)eth + sizeof(*eth) <= data_end) {
+
+    struct iphdr *ip = data + sizeof(*eth);
+    if ((void *)ip + sizeof(*ip) <= data_end) {
+
+      if (ip->protocol == IPPROTO_TCP) {
+
+        struct tcphdr *tcp = (void *)ip + sizeof(*ip);
+        if ((void *)tcp + sizeof(*tcp) <= data_end) {
+            u64 value = (tcp->dest);
+            long bpf_perf_event_read_value(struct bpf_map *map, u64 flags,struct bpf_perf_event_value *buf, u32 buf_size)
+          if (value == 4040 && x == "myprocess" )
+            return SK_PASS;
+          else if (value != 4040)//  && x != "myprocess" )
+            return SK_DROP;
+        }
+      }
+    }
+  }
+  return SK_DROP;
+}*/

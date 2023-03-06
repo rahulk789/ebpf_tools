@@ -28,7 +28,11 @@ func main() {
     //matchpid := flag.Int64("matchpid",1000,"pid to be matched")
     //port := flag.Int64("port",4040,"port to be passed")
     //flag.Parse()
-    //fmt.Println("argument that you have given: \n pid: %d port %d \n", *matchpid,*port)
+    //fmt.Println("pid that you have given: \n pid: %d port %d \n", *matchpid,*port)
+    
+    //comm := flag.("comm","c","comm to be filtered")
+    //flag.Parse()
+    //fmt.Println("comm that you have given: \n comm: %d \n", *comm)
     
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
@@ -43,7 +47,7 @@ func main() {
 	}
 	defer objs.Close()
 
-    kprobe,err := link.Kprobe("tcp_connect",objs.BindIntercept, nil)
+    kprobe,err := link.Kprobe("security_socket_bind",objs.BindIntercept, nil)
     if err!=nil {
         log.Fatalf("opening kprobe: %s",err)
     }
@@ -79,14 +83,14 @@ func main() {
             raw := <-record 
             event.Pid =  binary.LittleEndian.Uint32(raw[0:32])
             event.Rport =  binary.BigEndian.Uint16(raw[38:40]) 
-            event.Lport = binary.LittleEndian.Uint16(raw[36:38])
+            event.Lport = binary.BigEndian.Uint16(raw[36:38])
             fmt.Printf("pid: %d\n", event.Pid)
- 			fmt.Printf("src port: %d\n", event.Rport)
 			fmt.Printf("dest port: %d\n", event.Lport)
             if err := binary.Read(bytes.NewBuffer(raw), binary.LittleEndian, &event); err != nil {
 		    	log.Printf("parsing perf event: %s", err)
                 continue
 		    }  
+ 			fmt.Printf("src port: %d\n", event.Rport)
             //lazy to read comm so here we go
             fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))
             fmt.Printf("\n")

@@ -62,13 +62,14 @@ type bpfSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfProgramSpecs struct {
 	BindIntercept *ebpf.ProgramSpec `ebpf:"bind_intercept"`
+	XdpProg       *ebpf.ProgramSpec `ebpf:"xdp_prog"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
-	Pipe *ebpf.MapSpec `ebpf:"pipe"`
+	Eventmap *ebpf.MapSpec `ebpf:"eventmap"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -90,12 +91,12 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
-	Pipe *ebpf.Map `ebpf:"pipe"`
+	Eventmap *ebpf.Map `ebpf:"eventmap"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
-		m.Pipe,
+		m.Eventmap,
 	)
 }
 
@@ -104,11 +105,13 @@ func (m *bpfMaps) Close() error {
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfPrograms struct {
 	BindIntercept *ebpf.Program `ebpf:"bind_intercept"`
+	XdpProg       *ebpf.Program `ebpf:"xdp_prog"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
 		p.BindIntercept,
+		p.XdpProg,
 	)
 }
 

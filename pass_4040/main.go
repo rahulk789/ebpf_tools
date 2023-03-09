@@ -5,19 +5,13 @@
 package main
 
 import (
-//    "errors"
-    "syscall"
-    "os/signal"
-    "os"
+    "net"
     "log"
-    "bytes"
-    "encoding/binary"
     "fmt"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
-    "github.com/cilium/ebpf/perf"
+    "time"
     "golang.org/x/sys/unix"
-
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang -type info bpf ./tcp.bpf.c -- -I/usr/include/bpf -I.
@@ -34,12 +28,13 @@ func main() {
     //flag.Parse()
     //fmt.Println("comm that you have given: \n comm: %d \n", *comm)
     
-	stopper := make(chan os.Signal, 1)
-	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
-
     if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
 	}
+    
+    ifaceName := "lo"
+	iface, _ := net.InterfaceByName(ifaceName)
+	
 
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
@@ -53,45 +48,29 @@ func main() {
     }
     defer kprobe.Close()
 
-    rd, err := perf.NewReader(objs.Pipe, os.Getpagesize())
+    l, err := link.AttachXDP(link.XDPOptions{
+		Program:   objs.XdpProg,
+		Interface: iface.Index,
+	})
 	if err != nil {
-		log.Fatalf("creating perf event reader: %s", err)
+		log.Fatalf("could not attach XDP program: %s", err)
 	}
-	defer rd.Close()
+	defer l.Close()
+    log.Printf("Listening for events..")
 
-    record:=make(chan []byte)
-	var event bpfInfo
-    go func() {
-		for {
-			eventss, err := rd.Read()
-            if err != nil {
-			    log.Fatalf("closing ringbuf reader: %s", err)
-            }
-           record <- eventss.RawSample
-		}
-	}()
-
-	log.Printf("Listening for events..")
-	for {   	
-            go func() {
-		        <-stopper
-		        if err := rd.Close(); err != nil {
-			    log.Fatalf("closing ringbuf reader: %s", err)
-                }
-	        }()
-
-            raw := <-record 
-            event.Pid =  binary.LittleEndian.Uint32(raw[0:32])
-            event.Rport =  binary.BigEndian.Uint16(raw[38:40]) 
-            event.Lport = binary.BigEndian.Uint16(raw[36:38])
-            fmt.Printf("pid: %d\n", event.Pid)
-			fmt.Printf("dest port: %d\n", event.Lport)
-            if err := binary.Read(bytes.NewBuffer(raw), binary.LittleEndian, &event); err != nil {
-		    	log.Printf("parsing perf event: %s", err)
+    ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	
+    var event bpfInfo
+    const key uint32 = 0
+    for range ticker.C{
+            if err := objs.Eventmap.Lookup(key, &event); err != nil {
+		    	log.Println("reading map: %v", err)
                 continue
-		    }  
- 			fmt.Printf("src port: %d\n", event.Rport)
-            //lazy to read comm so here we go
+	    	}
+            fmt.Printf("pid: %d\n",event.Pid)
+			fmt.Printf("dest port: %d\n",event.Lport)
+ 			fmt.Printf("src port: %d\n",event.Rport)
             fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))
             fmt.Printf("\n")
 		}

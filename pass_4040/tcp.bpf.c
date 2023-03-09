@@ -20,15 +20,27 @@ char __license[] SEC("license") = "Dual MIT/GPL";
 #define PT_REGS_PARM4(x) ((x)->cx)
 #define PT_REGS_PARM5(x) ((x)->r8)
 
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-} pipe SEC(".maps");
+# define __bpf_ntohs(x)			__builtin_bswap16(x)
 
 struct info {
     u32 pid;
     u8 comm[32];
     u16 lport;
     u16 rport;
+}x;
+
+struct bpf_map_def {
+      unsigned int type;
+      unsigned int key_size;
+      unsigned int value_size;
+      unsigned int max_entries;
+      unsigned int map_flags;
+};
+struct bpf_map_def SEC("maps") eventmap = {
+	.type = BPF_MAP_TYPE_ARRAY,
+	.key_size = sizeof(u32),
+    .value_size = sizeof(x),
+    .max_entries = 3,
 };
 
 const struct info *unused __attribute__((unused));
@@ -48,41 +60,57 @@ int bind_intercept(struct pt_regs *ctx,  const struct sockaddr *addr) {
     
     struct sockaddr *address = (struct sockaddr *) PT_REGS_PARM2(ctx);
     struct sockaddr_in *in_addr = (struct sockaddr_in *) address;
-
-    infostruct.lport = READ_KERN(in_addr->sin_port);
-    infostruct.rport  = READ_KERN(sk->__sk_common.skc_num);
-	//infostruct.rport  = BPF_CORE_READ(sk, __sk_common.skc_dport),     
     
-    bpf_perf_event_output(ctx,&pipe, BPF_F_CURRENT_CPU, &infostruct, sizeof(infostruct));
+    // checking bind port address
+    u16 x = READ_KERN(in_addr->sin_port);
+    infostruct.lport= bpf_ntohs(x);
+    infostruct.rport  = READ_KERN(sk->__sk_common.skc_num);
+
+    u32 key = 0;
+    bpf_map_update_elem(&eventmap,&key,&infostruct,BPF_ANY);
     return 0;
 }
 
-SEC("security_socket_bind")
-int socket(struct __sk_buff *skb) {
-    struct info *infostruct;
-    u32 key = bpf_get_smp_processor_id();
-    infostruct = bpf_map_lookup_elem(&pipe,&key);
-    if (!infostruct) return 0;
-    u8 Comm[32] = "s";
+SEC("xdp")
+int xdp_prog(struct xdp_md *skb) {
+    
+    struct info *s;
+    u32 key = 0;
+    u16 valuecheck= 4040;
+    s = bpf_map_lookup_elem(&eventmap,&key);
+    if (!s) return 0;
+    
+    //checking if the process comm is the one we want
+    bool commcheck =  s->comm[0]=='m' && s->comm[1]=='y' && s->comm[2]=='p' && s->comm[3]=='r' && s->comm[4]=='o' && s->comm[5]=='c' && s->comm[6]=='e' && s->comm[7]=='s' && s->comm[8]=='s';
+    
     void *data = (void *)(long)skb->data;
     void *data_end = (void *)(long)skb->data_end;
     struct ethhdr *eth = data;
-    if (Comm==infostruct->comm){
+    
+    if (commcheck){
         if ((void *)eth + sizeof(*eth) <= data_end) {
             struct iphdr *ip = data + sizeof(*eth);
             if ((void *)ip + sizeof(*ip) <= data_end) {
                 if (ip->protocol == IPPROTO_TCP) {
                     struct tcphdr *tcp = (void *)ip + sizeof(*ip);
                     if ((void *)tcp + sizeof(*tcp) <= data_end) {
-                        u64 value = (tcp->dest);
-                        if (value == 4040)
-                        return SK_PASS;
-                        else if (value != 4040)
-                        return SK_DROP;
+                        
+                        u16 value,valuex = tcp->dest;
+                        value = bpf_ntohs(valuex);
+                        
+                        // uncomment the following lines for debugging, output received in " sudo cat  /sys/kernel/debug/tracing/trace_pipe "
+                        // const char fmt_str[] = "Hello, world, from BPF! My PORT is %d\n";
+                        // bpf_trace_printk(fmt_str, sizeof(fmt_str),value);
+                        
+                        if (value == valuecheck || (value>=35000 && value<=65535) )
+                        return XDP_PASS;
+                        else 
+                        return XDP_DROP;
+
                     }
                 }
             }
         }
     }
-    return SK_PASS;
+    return XDP_PASS;
 }

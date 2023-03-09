@@ -19,11 +19,11 @@ import (
 
 func main() {
 
-    //matchpid := flag.Int64("matchpid",1000,"pid to be matched")
+    //TODO: 
+    // Take port number and comm as input instead of fixed "4040" and "myprocess" 
     //port := flag.Int64("port",4040,"port to be passed")
     //flag.Parse()
     //fmt.Println("pid that you have given: \n pid: %d port %d \n", *matchpid,*port)
-    
     //comm := flag.("comm","c","comm to be filtered")
     //flag.Parse()
     //fmt.Println("comm that you have given: \n comm: %d \n", *comm)
@@ -68,10 +68,12 @@ func main() {
 		    	log.Println("reading map: %v", err)
                 continue
 	    	}
-            fmt.Printf("pid: %d\n",event.Pid)
-			fmt.Printf("dest port: %d\n",event.Lport)
- 			fmt.Printf("src port: %d\n",event.Rport)
-            fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))
+            fmt.Printf("\x1bc")
             fmt.Printf("\n")
+            fmt.Printf("#Current event:")
+            fmt.Printf("\n")
+            fmt.Printf("pid: %d\n",event.Pid)
+            fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))
+			fmt.Printf("bind port: %d\n",event.Lport)
 		}
 }

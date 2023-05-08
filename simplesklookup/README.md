@@ -1,5 +1,5 @@
 
-Write A sklookup program using sockmap in order to divert traffic from port 4000 to port 5000 in a helloworld client-server model
+Write A sklookup program using sockmap in order to divert traffic from port 4000 to port 5000 in a client-server model
 
 Thought process:
 * Create kernel space ebpf file with src port fd in sockmap and dest port defined. 

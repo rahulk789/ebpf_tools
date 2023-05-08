@@ -6,7 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <linux/bpf.h>
 
 #include "syscall.h"
 

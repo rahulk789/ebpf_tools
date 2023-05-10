@@ -1,47 +1,29 @@
-APP=bpf
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (c) 2020 Cloudflare
 
-.PHONY: build
-build: gen $(APP)
+KERNEL_INC := /usr/include/bpf
+VMLINUX := ./vmlinux.h
 
-.PHONY: run
-run: build
-	sudo ./$(APP)
+CC := clang
+CFLAGS := -g -O2 -Wall -Wextra
+CPPFLAGS := -I$(KERNEL_INC) 
 
-.PHONY: gen
-gen: sum vmlinux gen_pid_bpfel.go
+PROGS := sockmap-update sk-lookup-attach redirect.bpf.o
 
-.PHONY: vmlinux
-vmlinux: vmlinux.h
+.PHONY: all
+all: $(PROGS)
 
-.PHONY: sum
-sum: go.sum
+sockmap-update: sockmap_update.c $(KERNEL_INC) 
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
-.PHONY: fmt
-fmt: sum
-	go fmt main.go
+sk-lookup-attach: sk_lookup_attach.c $(KERNEL_INC)  
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
+
+redirect.bpf.o: redirect.bpf.c $(KERNEL_INC) $(VMLINUX)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -target bpf -c -o $@ $<
 
 .PHONY: clean
 clean:
-	-rm $(APP)
-	-rm gen*
-	-rm vmlinux.h
-	-rm go.sum
-	sed 's/v.*/latest/g' -i go.mod
-
-$(APP): main.go gen_pid_bpfel.go
-	 go build 
-
-vmlinux.h:
-	bpftool btf dump file /sys/kernel/btf/vmlinux format c > ./vmlinux.h
-
-gen_pid_bpfel.go: pid.bpf.c
-	go generate main.go
-
-go.sum:
-	go mod download github.com/cilium/ebpf
-
-
-
-
+	rm -f $(PROGS)
 
 

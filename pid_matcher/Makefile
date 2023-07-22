@@ -23,10 +23,9 @@ fmt: sum
 .PHONY: clean
 clean:
 	-rm $(APP)
-	-rm gen*
+	-rm bpf*
 	-rm vmlinux.h
 	-rm go.sum
-	sed 's/v.*/latest/g' -i go.mod
 
 $(APP): main.go gen_pid_bpfel.go
 	 go build 
@@ -38,8 +37,8 @@ gen_pid_bpfel.go: pid.bpf.c
 	go generate main.go
 
 go.sum:
-	go mod download github.com/cilium/ebpf
-
+	-go mod download github.com/cilium/ebpf
+	-go get github.com/cilium/ebpf/internal/unix@v0.9.1
 
 
 

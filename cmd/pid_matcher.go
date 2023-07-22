@@ -1,7 +1,6 @@
 package cmd
 import (
 	"fmt"
-    "github.com/rahulk789/ebpf_tools/cmd"
 	"github.com/spf13/cobra"
 )
 var (
@@ -17,5 +16,5 @@ func test(ccmd *cobra.Command, args []string) {
     fmt.Println("this is pidmatcher")
 }
 func init() {
-    	cmd.rootCmd.AddCommand(testCmd)
+    	rootCmd.AddCommand(testCmd)
     }

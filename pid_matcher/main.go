@@ -63,12 +63,12 @@ func main() {
 		}
 		// check if pid is matched or not
 		if value2 == 1 {
-			log.Printf("Current pid %d \t is pid matched? %s \n", value1, "No")
+			fmt.Printf("Current pid %d \t is pid matched? %s \n", value1, "No")
 			continue
 		}
 		if count == 1 {
 			continue
 		}
-		log.Printf("Current pid %d \t is pid matched? %s \n", value1, "Yes!!!")
+		fmt.Printf("Current pid %d \t is pid matched? %s \n", value1, "Yes!!!")
 	}
 }

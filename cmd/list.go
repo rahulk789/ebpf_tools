@@ -4,18 +4,17 @@ import (
 	"github.com/spf13/cobra"
 )
 var (
-	listCmd = &cobra.Command{
+	testCmd = &cobra.Command{
 		Use:   "list",
-		Short: "List all available program tools !!",
+		Short: "List all available programs for execution",
 		Long:  ``,
 		Run: list,
 	}
 )
 
 func list(ccmd *cobra.Command, args []string) {
-		fmt.Println("hello world")
+    fmt.Println("tcp-connect\npid-matcher\n")
 }
-
 func init() {
-    	rootCmd.AddCommand(listCmd)
+    	rootCmd.AddCommand(testCmd)
     }

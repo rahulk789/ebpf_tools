@@ -16,7 +16,7 @@ import (
 
 func main() {
 
-	matchpid := flag.Int64("matchpid", 1000, "pid to be matched")
+	matchpid := flag.Int64("pid", 1000, "pid to be matched")
 	flag.Parse()
 	fmt.Println("argument that you have given:", *matchpid)
 

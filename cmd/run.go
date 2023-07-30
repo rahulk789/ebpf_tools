@@ -19,15 +19,22 @@ func run(ccmd *cobra.Command, args []string) {
     program, _ := ccmd.Flags().GetString("program")
     argss, _ := ccmd.Flags().GetString("args")
     if program=="pid-matcher" {
-     command := exec.Command("./pid_matcher/./pidmatcher","-pid",argss)
+     command := exec.Command("./pid-matcher/./pidmatcher","-pid",argss)
      command.Stdout = os.Stdout
      err := command.Run()
      if err != nil {
          log.Println("Enter pid to be matched using -a")
      }
     } else if program=="tcp-connect" {
-        command:= exec.Command("./bpf_core_read/./tcp_connect")
+        command:= exec.Command("./tcp-connect/./tcp_connect")
         command.Stdout = os.Stdout
+        err := command.Run()
+        if err != nil {
+        log.Println(err)
+        }
+    } else if program=="cgroup-counter" {
+        command:= exec.Command("./cgroup-counter/./cgroup-counter")
+        command.Stderr = os.Stderr
         err := command.Run()
         if err != nil {
         log.Println(err)

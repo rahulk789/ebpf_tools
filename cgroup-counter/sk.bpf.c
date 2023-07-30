@@ -32,30 +32,5 @@ int count_egress_packets(struct __sk_buff *skb) {
 	}
 	__sync_fetch_and_add(count, 1);
 	
-	if (skb->protocol == htons(ETH_P_IP))
-	{
-    ih = ip_hdr(skb);
-    proto_num = ih->protocol;
-    switch (ih->protocol)
-    {
-    case IPPROTO_TCP:
-    {
-        struct tcphdr *th = tcp_hdr(skb);
-        src_port = th->source;
-        dest_port = th->dest;
-        break;
-    }
-    case IPPROTO_UDP:
-    {
-        struct udphdr *uh = udp_hdr(skb);
-        src_port = uh->source;
-        dest_port = uh->dest;
-        break;
-    }
-    default:
-        src_port = 0;
-        dest_port = 0;
-    }
-
 	return 1;
 }

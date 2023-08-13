@@ -68,9 +68,9 @@ func main() {
 		    	log.Println("reading map: %v", err)
                 continue
 	    	}
-            fmt.Printf("\x1bc")
-            fmt.Printf("\n")
-            fmt.Printf("#Current event:")
+//            fmt.Printf("\x1bc")
+ //           fmt.Printf("\n")
+ //           fmt.Printf("#Current event:")
             fmt.Printf("\n")
             fmt.Printf("pid: %d\n",event.Pid)
             fmt.Printf("comm: %s\n",unix.ByteSliceToString(event.Comm[:]))

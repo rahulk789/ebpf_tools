@@ -26,10 +26,7 @@ RUN cd libbpf-bootstrap/libbpf/src && \
 
 RUN cd libbpf-bootstrap/bpftool/src && \
     make && \
-    cp bpftool /bin/bpftool
-
-RUN cd libbpf-bootstrap/vmlinux && \
-    cp vmlinux.h /src/ebpf_tools/vmlinux.h
+    cp bpftool /bin/bpftool 
 
 # Clones the linux kernel repo and use the latest linux kernel source BPF headers 
 RUN git clone --depth 1 git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git && \
@@ -37,6 +34,7 @@ RUN git clone --depth 1 git://git.kernel.org/pub/scm/linux/kernel/git/stable/lin
 
 RUN git clone https://github.com/rahulk789/ebpf_tools && \
     cd ebpf_tools && \
+    cp /src/libbpf-bootstrap/vmlinux/vmlinux.h /src/ebpf_tools/vmlinux.h && \
     make 
 
 
